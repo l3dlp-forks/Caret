@@ -1,11 +1,11 @@
 define([
     "command",
     "storage/file",
-    "util/manos",
     "settings!ace,user",
     "util/template!templates/tab.html",
-    "ui/dialog"
-  ], function(command, File, M, Settings, inflate, dialog) {
+    "ui/dialog",
+    "util/chromePromise"
+  ], function(command, File, Settings, inflate, dialog, chromeP) {
     
   /*
   
@@ -46,7 +46,7 @@ define([
   };
   
   //hopefully this never screws up unaugmented Ace sessions.
-  Tab.prototype = EditSession.prototype;
+  Tab.prototype = Object.create(EditSession.prototype);
   
   Tab.prototype.setFile = function(file) {
     this.file = file;
@@ -55,15 +55,14 @@ define([
     this.setPath();
   };
 
-  Tab.prototype.setPath = function() {
-    var self = this;
-    if (this.file && !this.file.virtual) this.file.getPath(function(err, path) {
-      self.path = path;
-      command.fire("session:render");
-    });
+  Tab.prototype.setPath = async function() {
+    if (!this.file || this.file.virtual) return;
+    var path = await this.file.getPath();
+    this.path = path;
+    command.fire("session:render");
   };
   
-  Tab.prototype.save = function(as) {
+  Tab.prototype.save = async function(as) {
     
     //strip final whitespace, if enabled
     if (Settings.get("user").trimTrailingWhitespace) {
@@ -71,53 +70,39 @@ define([
     }
     
     var content = this.getValue();
-    var self = this;
-    var deferred = M.deferred();
 
-    var whenOpen = function() {
-      self.file.write(content, function(err) {
-        if (err) {
-          return deferred.fail(err);
-        }
-        self.modifiedAt = new Date();
-        self.modified = false;
-        self.setPath();
-        command.fire("session:render");
-        deferred.done();
-      });
-    };
-
-    if (!self.file || as) {
+    if (!this.file || as) {
       var file = new File();
-      file.open("save", function(err) {
-        if (err) {
-          if (err.message != "User cancelled") dialog(err.message);
-          return deferred.fail(err);
+      try {
+        await file.open("save");
+      } catch(err) {
+        if (err.message != "User cancelled") {
+          dialog(err.message);
+          throw err;
         }
-        self.file = file;
-        self.fileName = file.entry.name;
-        delete self.syntaxMode;
-        self.detectSyntax();
-        whenOpen();
-      });
-    } else {
-      whenOpen();
+      }
+      this.file = file;
+      this.fileName = file.entry.name;
+      delete this.syntaxMode;
+      this.detectSyntax();
     }
-    
-    return deferred.promise();
+    await this.file.write(content);
+    this.modifiedAt = new Date();
+    this.modified = false;
+    this.setPath();
+    command.fire("session:render");
   };
   
-  Tab.prototype.drop = function() {
+  Tab.prototype.drop = async function() {
     //let listeners know, like the project manager
     this._emit("close");
     if (!this.file || !chrome.fileSystem.retainEntry) return;
     var id = this.file.retain();
     if (!id) return;
-    chrome.storage.local.get("retained", function(data) {
-      if (!data.retained) return;
-      var filtered = data.retained.filter(function(item) { return item != id });
-      chrome.storage.local.set({ retained: filtered });
-    });
+    var data = await chromeP.storage.local.get("retained");
+    if (!data.retained) return;
+    var filtered = data.retained.filter(item => item != id);
+    chrome.storage.local.set({ retained: filtered });  
   };
   
   Tab.prototype.render = function(index) {
@@ -130,29 +115,39 @@ define([
     });
     this.animationClass = "";
     return element;
-  }
+  };
+
+  Tab.prototype.applySettings = async function(syntaxValue) {
+    var data = await Settings.pull("user");
+    var userConfig = data.user;
+    var syntaxConfig = (data.user.syntaxSpecific || {})[syntaxValue] || {};
+    
+    //merge settings
+    for (var k in syntaxConfig) {
+      userConfig[k] = syntaxConfig[k];
+    }
+
+    this.setUseSoftTabs(!userConfig.useTabs);
+    this.setTabSize(userConfig.indentation || 2);
+    this.setUseWrapMode(userConfig.wordWrap);
+    this.setWrapLimit(userConfig.wrapLimit || null);
+    this.setNewLineMode(userConfig.lineEnding || "auto");
+    
+    this.setUseWorker(userConfig.useWorker);
+  };
   
-  Tab.prototype.detectSyntax = function(userConfig) {
-    //settings are async
-    var self = this;
-    Settings.pull("user").then(function(data) {
-      var userConfig = data.user;
-      self.setUseSoftTabs(!userConfig.useTabs);
-      self.setTabSize(userConfig.indentation || 2);
-      self.setUseWrapMode(userConfig.wordWrap);
-      self.setWrapLimit(userConfig.wrapLimit || null);
-      self.setNewLineMode(userConfig.lineEnding || "auto");
-      self.setUseWorker(userConfig.useWorker);
-    });
-    //syntax, however, is sync
+  Tab.prototype.detectSyntax = async function() {
     var syntaxValue = this.syntaxMode || "plain_text";
+
+    await this.applySettings(syntaxValue);
+
     if (this.file) {
       if (this.file.virtual) {
         //settings files are special
         syntaxValue = "javascript";
         this.setMode("ace/mode/javascript");
       } else if (this.file.entry) {
-        var extension = this.file.entry.name.split(".").pop();
+        var extension = this.file.entry.name.split(".").pop().toLowerCase();
         //this won't ever change, safe to get each time
         var aceConfig = Settings.get("ace");
         for (var i = 0; i < aceConfig.modes.length; i++) {
@@ -170,6 +165,18 @@ define([
     command.fire("session:syntax");
     return syntaxValue;
   }
+  
+  Tab.prototype.$startWorker = function() {
+    var userConfig = Settings.get("user");
+
+    // call the superclass method to start worker
+    EditSession.prototype.$startWorker.call(this);
+    
+    // configure jsHint worker if applicable
+    if (this.syntaxMode === 'javascript' && userConfig.jsHint && this.$worker) {
+      this.$worker.send('changeOptions', [userConfig.jsHint]);
+    }
+  };
   
   return Tab;
 

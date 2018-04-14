@@ -1,59 +1,26 @@
 {
-  //If you want to disable update checks at startup, change this
-  "promptForUpdates": true,
-
   "defaultTheme": "chrome", //This should be any of the supported Ace themes
-  /*
-  Ace theme names are usually underscored, lowercase versions of the "friendly" names:
-    ambiance
-    chaos
-    chrome
-    clouds
-    clouds_midnight
-    cobalt
-    crimson_editor
-    dawn
-    dreamweaver
-    eclipse
-    github
-    idle_fingers
-    katzenmilch
-    kuroir
-    merbivore
-    merbivore_soft
-    monokai
-    mono_industrial
-    pastel_on_dark
-    solarized_dark
-    solarized_light
-    son_of_obsidian
-    terminal
-    textmate
-    tomorrow
-    tomorrow_night
-    tomorrow_night_blue
-    tomorrow_night_bright
-    tomorrow_night_eighties
-    twilight
-    vibrant_ink
-    xcode
-  */
+  // look for theme-*.js here: https://github.com/ajaxorg/ace-builds/tree/master/src-noconflict
+  
   "uiTheme": "light", //dark, twilight, or light
   "autoHideProject": false, //collapse the project view until you hover
   "immersiveFullscreen": false, //hides menus/tabs in Chrome OS fullscreen mode
   "highlightLine": false,
   "hideGutter": false, //set to true to hide the line numbering
 
+  // editor options
   "showWhitespace": false, //show whitespace characters (spaces, tabs, returns)
+  "showMargin": false,
+  "scrollPastEnd": true, //allow the editor to scroll past the end of the document
+  "trimTrailingWhitespace": true, //run "Trim Trailing Whitespace" on save
+  "trimEmptyLines": false, //should the trim whitespace command also truncate empty lines?
+
+  // syntax options
   "indentation": 2, //indentation size
   "useTabs": false, //will turn off Ace's setUseSoftTabs() option and use tab characters instead
   "wordWrap": true,
   "wrapLimit": false, //Set to the number of characters you want or false for full window
-  "showMargin": false,
   "lineEndings": "auto", //newline format - "windows", "unix", or "auto"
-  "scrollPastEnd": true, //allow the editor to scroll past the end of the document
-  "trimTrailingWhitespace": true, //run "Trim Trailing Whitespace" on save
-  "trimEmptyLines": false, //should the trim whitespace command also truncate empty lines?
 
   //only fixed-width fonts supported, for now
   "fontFamily": "",
@@ -64,6 +31,8 @@
   "useWorker": true,
   //autocomplete triggers on Ctrl-Space
   "autocomplete": true,
+  //autocomplete triggers automatically
+  "autocompleteLive": false,
   //"Behaviors" are the auto-paired quotes and HTML tags in the editor
   "disableBehaviors": false,
 
@@ -71,10 +40,12 @@
   //If you'd like it to search all open files by default, set this option to true.
   "searchAllFiles": false,
   //set the max search results that project wide search will return.
-  "maxSearchMatches": 50,
+  "maxSearchMatches": 500,
 
   //set a regex to ignore in project view/search
   "ignoreFiles": "node_modules",
+  //by default, Caret doesn't show hidden folders (i.e., .git) in its project view
+  "showHiddenDirectories": false,
   //set this to enable autosave every X minutes
   "autosaveInterval": 0,
   "autosaveOnBlur": false,
@@ -83,9 +54,22 @@
   //Set this to stop the editor from restoring the last set of tabs it had open
   "disableTabRestore": false,
 
+  //If you want to disable update checks at startup, change this
+  "promptForUpdates": true,
+  // options are "background", "launch", and "silent"
+  "updateNotifications": "background",
+
+
   //Wildly eccentric? You might like Vim keybindings.
   "emulateVim": false,
+  
+  //jsHint settings are applied on opening a JS file
+  "jsHint": {},
 
-  //Whether to show the "New file" tab button on the tab bar;
-  "showNewTabButton": false
+  // You can set syntax options here. Not all options supported yet.
+  "syntaxSpecific": {
+    "python": {
+      "indentation": 4
+    }
+  }
 }

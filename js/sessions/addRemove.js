@@ -35,21 +35,16 @@ define([
   };
 
   //removeTab looks long, but it handles the async save/don't/cancel flow
-  var removeTab = function(index, c) {
+  var removeTab = function(index, c = function() {}) {
     if (!index) {
       index = state.tabs.indexOf(editor.getSession());
     }
     var tab = state.tabs[index];
-    state.stack = state.stack.filter(function(t) { return t !== tab });
+    state.stack = state.stack.filter(t => t !== tab);
 
     var continuation = function() {
       tab.drop();
-      state.tabs = state.tabs.filter(function(tab, i) {
-        if (i == index) {
-          return false;
-        }
-        return true;
-      });
+      state.tabs = state.tabs.filter((tab, i) => !(i == index));
       if (state.tabs.length == 0) {
         return addTab();
       }
@@ -63,7 +58,7 @@ define([
       } else {
         switching.raise(state.tabs[next]);
       }
-      if (c) c();
+      c();
     };
 
     if (tab.modified) {
@@ -79,7 +74,7 @@ define([
             return;
           }
           if (confirm) {
-            return tab.save(continuation);
+            return tab.save().then(continuation);
           }
           continuation();
         });

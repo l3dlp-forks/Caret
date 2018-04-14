@@ -1,5 +1,6 @@
 {
-  //To disable a key completely, set its value to null
+  // To disable Caret's key-capture behavior, set a value to null or false
+  // for example: "Ctrl-Space": null will defer that combo to the ChromeOS language switcher
   
   //basic navigation/application keys
   "Ctrl-O": "session:open-file",
@@ -45,9 +46,11 @@
   "Ctrl-=": { "command": "editor:adjust-zoom", "argument": 1 },
   "Ctrl-0": { "command": "editor:default-zoom" },
   "Ctrl-J": { "ace": "joinlines" },
+  "Ctrl-Shift-K": { "ace": "removeline" },
   "Ctrl-Shift-Up": { "ace": "movelinesup" },
   "Ctrl-Shift-Down": { "ace": "movelinesdown" },
   
   //dev mode
+  "Ctrl-Shift-M": "sequence:test",
   "Ctrl-.": { "command": "app:show-prompt" }
 }

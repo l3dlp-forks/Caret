@@ -8,7 +8,7 @@ define([
     */
 
     var external = "";
-    var element = document.find(".status-text");
+    var element = document.querySelector(".status-text");
     var update = function() {
       var selection = editor.getSelection();
       var displayText = "";
@@ -31,10 +31,12 @@ define([
           toastTimeout = null;
         }
         update();
+        return true;
       },
       clearMessage: function() {
         external = "";
         update();
+        return true;
       },
       toast: function(msg, seconds) {
         external = msg;
@@ -47,6 +49,7 @@ define([
           update();
           toastTimeout = null;
         }, seconds ? seconds * 1000 : 5000);
+        return true;
       }
     };
     

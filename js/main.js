@@ -8,36 +8,17 @@ require([
     "sessions",
     "util/manos",
     "util/i18n",
-    "ui/projectManager",
-    "ui/keys",
+    "util/chromePromise",
     "fileManager",
-    "ui/menus",
-    "ui/palette",
-    "ui/searchbar",
-    "ui/cli",
-    "ui/theme",
     "api",
-    "storage/syncfile"
-  ], function(command, editor, Settings, dialog, sessions, M, i18n) {
-  
+    "sequences",
+    "ui"
+  ], function(command, editor, Settings, dialog, sessions, M, i18n, chromeP) {
+
   //translate inline strings
   i18n.page();
-  
+
   var frame = chrome.app.window.current();
-  
-  var setTheme = function() {
-    Settings.pull("user").then(function(data) {
-      var themes = {
-        "dark": "css/caret-dark.css",
-        "twilight": "css/caret-twilight.css",
-        "light": "css/caret.css"
-      };
-      var theme = data.user.uiTheme || "light";
-      var url = themes[theme] || themes.dark;
-      document.find("#theme").setAttribute("href", url);
-    });
-  }
-  setTheme();
 
   //these are modules that must be loaded before init:complete
   var loadedModules = {
@@ -45,7 +26,7 @@ require([
     "fileManager": false,
     "sessions": false
   };
-  
+
   //the settings manager may also fire init:restart to re-init components after startup
   command.fire("init:startup", function(mod) {
     //ignore callback in non-essential modules
@@ -59,51 +40,68 @@ require([
     //all specified modules are loaded, app is ready for init:complete
     command.fire("init:complete");
   });
-  command.on("init:restart", setTheme);
-  
+
   //code to enable update checking
   var updateID = "caret:update";
-  
-  var checkUpdates = function(isManual) {
-    chrome.runtime.requestUpdateCheck(function(status, details) {
-      if (status == "update_available") {
-        chrome.runtime.onUpdateAvailable.addListener(function() {
-          chrome.notifications.clear(updateID, function() {
-            chrome.notifications.create(updateID, {
-              type: "basic",
-              iconUrl: "icon-128.png",
-              title: i18n.get("notificationUpdateAvailable"),
-              message: i18n.get("notificationUpdateDetail", details.version),
-              buttons: [
-                { title: i18n.get("notificationUpdateOK") },
-                { title: i18n.get("notificationUpdateWait") }
-              ]
-            }, function(id) { updateID = id });
-          });
-        });
-      } else {
-        if (isManual) chrome.notifications.create(updateID, {
+
+  var checkUpdates = async function(isManual) {
+    var [status, details] = await chromeP.runtime.requestUpdateCheck();
+    if (status == "update_available") {
+      chrome.runtime.onUpdateAvailable.addListener(async function() {
+      await chromeP.notifications.clear(updateID);
+      updateID = await chromeP.notifications.create(updateID, {
           type: "basic",
           iconUrl: "icon-128.png",
-          title: i18n.get("notificationNoUpdateTitle"),
-          message: i18n.get("notificationNoUpdateDetail")
-        }, function(id) { updateID = id });
+          title: i18n.get("notificationUpdateAvailable"),
+          message: i18n.get("notificationUpdateDetail", details.version),
+          buttons: [
+            { title: i18n.get("notificationUpdateOK") },
+            { title: i18n.get("notificationUpdateWait") }
+          ]
+        });
+      });
+    } else {
+      if (isManual) {
+        updateID = await chromeP.notifications.create(updateID, {
+        type: "basic",
+        iconUrl: "icon-128.png",
+        title: i18n.get("notificationNoUpdateTitle"),
+        message: i18n.get("notificationNoUpdateDetail")
+        });
       }
-    });
+    }
   };
-  
-  Settings.pull("user").then(function(cfg) {
+
+  // manage updates on start
+  Settings.pull("user").then(async function(cfg) {
     if (cfg.user.promptForUpdates !== false) checkUpdates();
+    if (cfg.user.updateNotifications == "launch") {
+      var background = await chromeP.runtime.getBackgroundPage();
+      var manifest = chrome.runtime.getManifest();
+      // console.log(background.updateVersion, manifest.version);
+      if (background.updateVersion && background.updateVersion != manifest.version) {
+        background.showUpdateNotification();
+        background.updateVersion = null;
+      }
+    }
   });
   command.on("app:check-for-updates", checkUpdates);
-  
+
+  //export update notification preference, possibly others
+  command.on("init:restart", async function() {
+    var cfg = await Settings.pull("user");
+    chromeP.storage.sync.set({
+      updateNotifications: cfg.user.updateNotifications
+    });
+  });
+
   chrome.notifications.onButtonClicked.addListener(function(id, index) {
     if (id != updateID) return;
     if (index == 0) {
       chrome.runtime.reload();
     }
   });
-  
+
   command.on("app:exit", function() {
     var cancelled = false;
     var tabs = sessions.getAllTabs();
@@ -131,61 +129,14 @@ require([
       if (!cancelled) frame.close();
     })
   });
-  
-  command.on("app:minimize", function() {
-    frame.minimize();
-    editor.focus();
-  });
-  
-  command.on("app:maximize", function() {
-    frame.isMaximized() || frame.isFullscreen() ? frame.restore() : frame.maximize();
-    editor.focus();
-  });
-  
-  command.on("app:restart", function() {
-    chrome.runtime.reload();
-  });
-  
-  //developer command for reloading CSS
-  command.on("app:reload-css", function() {
-    var link = document.querySelector("link#theme");
-    link.href = link.href;
-  });
-  
-  //handle immersive fullscreen
-  var onFullscreen = function() {
-    Settings.pull("user").then(function(data) {
-      if (data.user.immersiveFullscreen) {
-        document.find("body").addClass("immersive");
-        editor.resize();
-      }
-    });
-  }
-  
-  frame.onFullscreened.addListener(onFullscreen);
-  if (frame.isFullscreen()) {
-    onFullscreen();
-  }
-  
-  frame.onRestored.addListener(function() {
-    document.find("body").removeClass("immersive");
-  });
-  
+
   //It's nice to be able to launch the debugger from a command stroke
   command.on("app:debug", function() {
     debugger;
   });
-  
+
   command.on("app:browse", function(url) {
     window.open(url, "target=_blank");
   });
-  
-  //kill middle clicks if not handled
-  
-  document.body.on("click", function(e) {
-    if (e.button == 1) {
-      e.preventDefault();
-    }
-  });
-  
+
 });

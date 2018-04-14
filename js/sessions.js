@@ -6,10 +6,9 @@ define([
     "editor",
     "command",
     "settings!ace",
-    "util/template!templates/newTabButton.html",
     "aceBindings"
   ],
-  function(state, addRemove, switching, bindEvents, editor, command, Settings, inflate) {
+  function(state, addRemove, switching, bindEvents, editor, command, Settings) {
     
   /*
   
@@ -18,7 +17,7 @@ define([
   
   */
 
-  var syntax = document.find(".syntax");
+  var syntax = document.querySelector(".syntax");
 
   command.on("session:syntax", function(mode) {
     var session = editor.getSession();
@@ -29,26 +28,24 @@ define([
       mode = session.syntaxMode;
     }
     syntax.value = mode;
+    session.applySettings(mode);
   });
 
   var renderTabs = function() {
-    var tabContainer = document.find(".tabs");
+    var tabContainer = document.querySelector(".tabs");
     var contents = "";
     var current = editor.getSession();
     tabContainer.innerHTML = "";
     state.tabs.forEach(function(tab, i) {
       var element = tab.render(i);
       if (tab === current) {
-        element.addClass("active");
+        element.classList.add("active");
       }
-      tabContainer.append(element);
+      tabContainer.appendChild(element);
     });
-    if (Settings.get("user").showNewTabButton === true) {
-      tabContainer.append(inflate.get("templates/newTabButton.html"));
-    }
     setTimeout(function() {
       //wait for render before triggering the enter animation
-      tabContainer.findAll(".enter").forEach(function(element) { element.removeClass("enter") });
+      tabContainer.querySelectorAll(".enter").forEach(element => element.classList.remove("enter"));
     });
   };
 
@@ -68,7 +65,7 @@ define([
       var option = document.createElement("option");
       option.innerHTML = mode.label;
       option.value = mode.name;
-      syntax.append(option);
+      syntax.appendChild(option);
     });
     if (!state.tabs.length) addRemove.add("");
     renderTabs();
@@ -108,7 +105,7 @@ define([
       return null;
     },
     getFilenames: function() {
-      return state.tabs.map(function(t) { return t.fileName });
+      return state.tabs.map(t => t.fileName);
     },
     setCurrent: switching.raise,
     raiseBlurred: switching.raiseBlurred,
@@ -125,7 +122,7 @@ define([
       switching.raise(locationMemory.tab);
       editor.moveCursorToPosition(locationMemory.cursor);
     },
-    renderTabs: renderTabs
+    renderTabs
   }
 
 });

@@ -3,13 +3,13 @@ define([
     "settings!api"
   ], function(command, Settings) {
 
+  var noop = function() {};
+
   //handles sending custom messages based on Caret commands (builds, plugins, etc)
   var targets = Settings.get("api");
-  command.on("init:restart", function() {
-    targets = Settings.get("api");
-  });
+  command.on("init:restart", () => targets = Settings.get("api"));
 
-  command.on("api:execute", function(id, c) {
+  command.on("api:execute", async function(id, c = noop) {
     if (!id in targets) return c();
     var config = targets[id];
     var message = {};
@@ -19,39 +19,30 @@ define([
       //if we implement message variables, this would be the place to handle them.
       message[key] = config.message[key];
     }
-    var send = function() {
-      chrome.runtime.sendMessage(config.id, message, null, function() {
-        if (chrome.runtime.lastError) {
-          console.error(chrome.runtime.lastError);
-        }
-        if (c) c(chrome.runtime.lastError);
-      });
-    };
     if (config.sendEditorContext) {
       //add context information to the message
       message.context = {
-        selection: editor.session.getTextRange()
+        selection: editor.session.getTextRange(),
+        path: ""
       };
 
       if (editor.session.file && editor.session.file.getPath) {
-        editor.session.file.getPath(function(err, path) {
-          message.context.path = path;
-          send();
-        });
-      } else {
-        //no path for Caret config files or unsaved "untitled.txt"
-        message.context.path = "";
-        send();
+        var path = await editor.session.file.getPath();
+        message.context.path = path;
       }
 
-    } else {
-      //send message as-is
-      send();
     }
+    chrome.runtime.sendMessage(config.id, message, null, function() {
+      if (chrome.runtime.lastError) {
+        console.error(chrome.runtime.lastError);
+      }
+      c(chrome.runtime.lastError);
+    });
   });
 
   //External apps can send messages by matching Caret's command/argument config objects
-  chrome.runtime.onMessageExternal.addListener(function(message, sender, c) {
-    command.fire(message.command, message.argument, c);
+  chrome.runtime.onMessageExternal.addListener(async function(message, sender, c = noop) {
+    var result = await command.fire(message.command, message.argument);
+    c(null, result);
   });
 });

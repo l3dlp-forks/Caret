@@ -1,7 +1,7 @@
 {
   "name": "Caret",
   "description": "Professional text editing for Chrome and Chrome OS",
-  "version": "1.6.7",
+  "version": "1.8.9",
   "manifest_version": 2,
   "default_locale": "en",
   "icons": {
@@ -12,8 +12,7 @@
   "app": {
     "background": {
       "scripts": [
-        "background.js",
-        "installer.js"
+        "background.js"
       ]
     }
   },
@@ -24,6 +23,7 @@
     "storage",
     "notifications",
     "syncFileSystem",
+    "app.window.fullscreen.overrideEsc",
     {
       "fileSystem": [
         "write",
@@ -41,12 +41,8 @@
         "application/json",
         "application/x-shellscript",
         "application/xml",
-        "application/*",
         "text/*"
       ]
-    },
-    "any": {
-      "types": ["*/*"]
     }
   }
 }
